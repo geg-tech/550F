@@ -4,6 +4,8 @@
 
 pros::MotorGroup left_motors({-10, -18, -19}, pros::MotorGearset::blue); // left motors on ports 10, 18, 19
 pros::MotorGroup right_motors({1, 11, 12}, pros::MotorGearset::blue); // right motors on ports 1, 11, 12
+pros::MotorGroup lift_motors({10,-11}, pros::MotorGearset::green); //Lift motors on ports 10 and 11
+pros::Motor claw(13, pros::MotorGearset::green);
 
 // create an imu on port 15
 pros::Imu imu(15);
@@ -165,9 +167,20 @@ void opcontrol() {
         // move the robot
         chassis.arcade(leftY, rightX);
 
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN) and controller.get_digital(pros::E_CONTROLLER_DIGITAL_B)) {
-            // Test Autonomous Functions
-            autonomous();
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+            lift_motors.move(127);
+        } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)){
+            lift_motors.move(-127);
+        } else {
+            lift_motors.move(0);
+        }
+
+        if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)){
+            claw.move(127);
+        }else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)){
+            claw.move(-127);
+        } else {
+            claw.move(0);
         }
 
         // delay to save resources
