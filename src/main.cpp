@@ -2,13 +2,13 @@
 #include "lemlib/api.hpp" // IWYU pragma: keep
 #include "pros/misc.h"
 
-pros::MotorGroup left_motors({-10, -18, -19}, pros::MotorGearset::blue); // left motors on ports 10, 18, 19
-pros::MotorGroup right_motors({1, 11, 12}, pros::MotorGearset::blue); // right motors on ports 1, 11, 12
-pros::MotorGroup lift_motors({10,-11}, pros::MotorGearset::green); //Lift motors on ports 10 and 11
+pros::MotorGroup left_motors({-5, -6, -7}, pros::MotorGearset::blue); // left motors on ports 10, 18, 19
+pros::MotorGroup right_motors({2, 3, 4}, pros::MotorGearset::blue); // right motors on ports 1, 11, 12
+pros::MotorGroup lift_motors({11,-12}, pros::MotorGearset::blue); //Lift motors on ports 10 and 11
 pros::Motor claw(13, pros::MotorGearset::green);
 
 // create an imu on port 15
-pros::Imu imu(15);
+pros::Imu imu(8);
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&left_motors, // left motor group
                               &right_motors, // right motor group
@@ -72,6 +72,18 @@ void on_center_button() {
 		pros::lcd::clear_line(2);
 	}
 }
+
+// curvin woo
+lemlib::ExpoDriveCurve throttle_curve(3, // joystick deadband out of 127
+                                     10, // minimum output where drivetrain will move out of 127
+                                     1.019 // expo curve gain
+);
+
+// curvin
+lemlib::ExpoDriveCurve steer_curve(3, // joystick deadband out of 127
+                                  10, // minimum output where drivetrain will move out of 127
+                                  1.019 // expo curve gain
+);
 
 lemlib::Chassis chassis(drivetrain, // drivetrain settings
                         lateral_controller, // lateral PID settings
