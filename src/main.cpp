@@ -186,9 +186,9 @@ void opcontrol() {
         chassis.arcade(leftY, rightX);
 
         if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) { //lift 
-            lift_motors.move(100);
+            lift_motors.move(127);
         } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)){ //lower
-            lift_motors.move(-100);
+            lift_motors.move(-127);
         } else {
             lift_motors.move(0);
         }
@@ -211,13 +211,13 @@ void opcontrol() {
         if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)){
             if (clawPosition == false){
                 
-                lift_motors.move_relative(150, 100); //lift up by a minor amount to prevent hitting the ramp
-                wrist.move_absolute(-500, 100); //flip wrist upright for scoring
+                lift_motors.move_relative(500, 127); //lift up by a minor amount to prevent hitting the ramp
+                wrist.move_absolute(-1000, 127); //flip wrist upright for scoring
 
                 clawPosition = true; // set to other position (scoring position)
             } else if (clawPosition == true){
 
-                wrist.move_absolute(0, 100); //flip wrist down for intaking
+                wrist.move_absolute(0, 127); //flip wrist down for intaking
 
                 clawPosition = false; //set to other position (intaking position)
             }
