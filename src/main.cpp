@@ -4,11 +4,13 @@
 
 pros::MotorGroup left_motors({-5, -6, -7}, pros::MotorGearset::blue); // left motors on ports 10, 18, 19
 pros::MotorGroup right_motors({2, 3, 4}, pros::MotorGearset::blue); // right motors on ports 1, 11, 12
-pros::MotorGroup lift_motors({11,-12}, pros::MotorGearset::blue); //Lift motors on ports 10 and 11
-pros::Motor claw(13, pros::MotorGearset::green);
+pros::MotorGroup lift_motors({13,-14}, pros::MotorGearset::blue); //Lift motors on ports 13 and 14
+pros::Motor claw(12, pros::MotorGearset::green); //banshee motor (positive = intake, negative = outtake)
+pros::Motor wrist(11, pros::MotorGearset::green); //wrist motor (-300 deg. = upright, 0 deg = down)
+pros::Motor intake(8, pros::MotorGearset::blue); //intake motor (negative = intake, positive = reverse)
 
 // create an imu on port 15
-pros::Imu imu(8);
+pros::Imu imu(15);
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&left_motors, // left motor group
                               &right_motors, // right motor group
@@ -99,7 +101,7 @@ lemlib::Chassis chassis(drivetrain, // drivetrain settings
  */
 void initialize() {
 	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
+	pros::lcd::set_text(1, "Hello Bro.");
 
 	pros::lcd::register_btn1_cb(on_center_button);
 	pros::lcd::initialize(); // initialize brain screen
@@ -169,30 +171,58 @@ void autonomous() {
  */
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
+// make a boolean variable to track the scoring/intaking macro
+bool clawPosition = false;
+
 void opcontrol() {
     // loop forever
     while (true) {
-        // get left y and right x positions
+        //drivetrain driver op code
+            // get left y and right x positions
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int rightX = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
         // move the robot
         chassis.arcade(leftY, rightX);
 
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
-            lift_motors.move(127);
-        } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)){
-            lift_motors.move(-127);
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) { //lift 
+            lift_motors.move(100);
+        } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)){ //lower
+            lift_motors.move(-100);
         } else {
             lift_motors.move(0);
         }
+        //end of drivetrain op code
 
-        if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)){
+        if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)){ //intake
+            // spin both claw and intake at once to ensure smooth flow
+            // essentially a motor group, but separate for autos
             claw.move(127);
-        }else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)){
+            intake.move(-127);
+        }else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)){ //outtake
             claw.move(-127);
+            intake.move(127);
         } else {
             claw.move(0);
+            intake.move(0);
+        }
+
+        //make a short macro for toggling scoring position
+        if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)){
+            if (clawPosition == false){
+                
+                lift_motors.move_relative(150, 100); //lift up by a minor amount to prevent hitting the ramp
+                wrist.move_absolute(-500, 100); //flip wrist upright for scoring
+
+                clawPosition = true; // set to other position (scoring position)
+            } else if (clawPosition == true){
+
+                wrist.move_absolute(0, 100); //flip wrist down for intaking
+
+                clawPosition = false; //set to other position (intaking position)
+            }
+            
+            
         }
 
         // delay to save resources
