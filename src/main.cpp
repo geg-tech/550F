@@ -39,7 +39,7 @@ lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel
 // lateral PID controller
 lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
                                               0, // integral gain (kI)
-                                              3, // derivative gain (kD)
+                                              3, // derivative gain (kD) // was 3
                                               3, // anti windup
                                               1, // small error range, in inches
                                               100, // small error range timeout, in milliseconds
@@ -49,9 +49,9 @@ lemlib::ControllerSettings lateral_controller(10, // proportional gain (kP)
 );
 
 // angular PID controller
-lemlib::ControllerSettings angular_controller(2, // proportional gain (kP)
+lemlib::ControllerSettings angular_controller(2.75, // proportional gain (kP)
                                               0, // integral gain (kI)
-                                              10, // derivative gain (kD)
+                                              22, // derivative gain (kD)
                                               0, // anti windup
                                               0, // small error range, in degrees
                                               0, // small error range timeout, in milliseconds
@@ -75,7 +75,7 @@ void on_center_button() {
 	}
 }
 
-// curvin woo
+// add driver control curves to make it smootha
 lemlib::ExpoDriveCurve throttle_curve(3, // joystick deadband out of 127
                                      10, // minimum output where drivetrain will move out of 127
                                      1.019 // expo curve gain
@@ -84,7 +84,7 @@ lemlib::ExpoDriveCurve throttle_curve(3, // joystick deadband out of 127
 // curvin
 lemlib::ExpoDriveCurve steer_curve(3, // joystick deadband out of 127
                                   10, // minimum output where drivetrain will move out of 127
-                                  1.019 // expo curve gain
+                                  3.000 // expo curve gain
 );
 
 lemlib::Chassis chassis(drivetrain, // drivetrain settings
@@ -222,7 +222,21 @@ void opcontrol() {
                 clawPosition = false; //set to other position (intaking position)
             }
             
-            
+            pros::delay(25); // delay to debounce
+        }
+
+        //make a small macro to test PID
+        //angular PID
+        if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_B)){
+            //reset position
+            chassis.setPose(0,0,0);
+            //turn
+            chassis.turnToHeading(90,4000);
+            pros::delay(100);
+            chassis.turnToHeading(180,4000);
+            pros::delay(100);
+            chassis.turnToHeading(0,4000);
+            pros::delay(100);
         }
 
         // delay to save resources
