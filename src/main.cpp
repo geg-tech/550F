@@ -12,11 +12,11 @@ pros::Motor wrist(11, pros::MotorGearset::green); //wrist motor (-300 deg. = upr
 pros::Motor intake(8, pros::MotorGearset::blue); //intake motor (negative = intake, positive = reverse)
 
 //create pneumatics
-pros::ADIDigitalOut tipperMech ('A');
+pros::adi::DigitalOut tipperMech ('A');
 
 //create 3-wire and smart port sensors
-pros::ADIDigitalIn liftLimit('F');
-pros::ADIDigitalIn wristLimit('G');
+pros::adi::DigitalIn liftLimit('F');
+pros::adi::DigitalIn wristLimit('G');
 
 // create controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
@@ -82,6 +82,16 @@ lemlib::Chassis chassis(drivetrain, // drivetrain settings
                         sensors // odometry sensors
 );
 
+//yeah this function has to be here it stupid
+void on_center_button() {
+	static bool pressed = false;
+	pressed = !pressed;
+	if (pressed) {
+		pros::lcd::set_text(2, "tee hee that tickles");
+	} else {
+		pros::lcd::clear_line(2);
+	}
+}
 
 // ==================================== initialize ====================================
 // auton selector is made here
@@ -148,16 +158,6 @@ void initialize(){
 void disabled() {}
 
 void competition_initialize() {}
-
-void on_center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if (pressed) {
-		pros::lcd::set_text(2, "tee hee that tickles");
-	} else {
-		pros::lcd::clear_line(2);
-	}
-}
 
 // ==================================== autonomous ====================================
 void autonomous() {
