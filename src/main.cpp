@@ -9,6 +9,9 @@ pros::Motor claw(12, pros::MotorGearset::green); //banshee motor (positive = int
 pros::Motor wrist(11, pros::MotorGearset::green); //wrist motor (-300 deg. = upright, 0 deg = down)
 pros::Motor intake(8, pros::MotorGearset::blue); //intake motor (negative = intake, positive = reverse)
 
+pros::Controller controller(pros::E_CONTROLLER_MASTER);
+
+
 // create an imu on port 15
 pros::Imu imu(15);
 // drivetrain settings
@@ -20,18 +23,10 @@ lemlib::Drivetrain drivetrain(&left_motors, // left motor group
                               2 // horizontal drift is 2 (for now)
 );
 
-// horizontal tracking wheel encoder
-pros::Rotation horizontal_encoder(20);
-// vertical tracking wheel encoder
-pros::adi::Encoder vertical_encoder('C', 'D', true);
-// horizontal tracking wheel
-lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_encoder, lemlib::Omniwheel::NEW_2, -5.75);
-// vertical tracking wheel
-lemlib::TrackingWheel vertical_tracking_wheel(&vertical_encoder, lemlib::Omniwheel::NEW_2, -2.5);
 
-lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel 1, set to null
+lemlib::OdomSensors sensors(nullptr, // vertical tracking wheel 1, set to null
                             nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
-                            &horizontal_tracking_wheel, // horizontal tracking wheel 1
+                            nullptr, // horizontal tracking wheel 1
                             nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
                             &imu // inertial sensor
 );
@@ -99,26 +94,64 @@ lemlib::Chassis chassis(drivetrain, // drivetrain settings
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
-void initialize() {
-	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello Bro.");
+    int autonSelection = 0;
+void initialize(){                                                                                                                                
+    pros::lcd::initialize();
+    pros::lcd::register_btn1_cb(on_center_button);
+    chassis.calibrate(); // Calibrates properly
 
-	pros::lcd::register_btn1_cb(on_center_button);
-	pros::lcd::initialize(); // initialize brain screen
-    chassis.calibrate(); // calibrate sensors
-    // print position to brain screen
+    // 1. FIXED CONDITION: Only block out if actually in an official match autonomous or disabled
+    while (!pros::competition::is_autonomous() && !pros::competition::is_disabled()) {
+        
+        // Handle Selection Cycling
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) {
+            autonSelection = autonSelection + 1; 
+            if (autonSelection >= 4) autonSelection = 0; 
+        } else if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
+            autonSelection = autonSelection - 1; 
+            if (autonSelection < 0) autonSelection = 3;  
+        }
+
+        // Display text safely on rows 0 and 1
+        pros::lcd::print(0, "Selected Auton ID: %d   ", autonSelection);
+
+        switch (autonSelection) {
+            case 0: pros::lcd::print(1, "Selected Red Auton     "); break;
+            case 1: pros::lcd::print(1, "Selected Blue Auton    "); break;
+            case 2: pros::lcd::print(1, "Selected Yellow Auton  "); break;
+            case 3: pros::lcd::print(1, "Selected Skills Auton  "); break;
+            default: pros::lcd::print(1, "Selected Default Auton "); break;
+        }
+
+        // TESTING TRIGGER: Press A to immediately run Auton
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A)) {
+            pros::lcd::print(2, "RUNNING TEST AUTON NOW!  ");
+            pros::delay(1000); 
+            autonomous();      
+            break;             
+        }
+
+        // PRACTICE DRIVING TRIGGER: Press B to proceed straight to opcontrol
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)) {
+            pros::lcd::print(2, "BYPASSING TO DRIVER MODE ");
+            pros::delay(200); 
+            break;             
+        }
+
+        pros::delay(20); // Keep at 20ms to match controller polling rates
+    }
+
+    //print the odometry
     pros::Task screen_task([&]() {
         while (true) {
-            // print robot location to the brain screen
-            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
-            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-            // delay to save resources
-            pros::delay(20);
+            pros::lcd::print(4, "X: %f", chassis.getPose().x); 
+            pros::lcd::print(5, "Y: %f", chassis.getPose().y); 
+            pros::lcd::print(6, "Theta: %f", chassis.getPose().theta); 
+            pros::delay(50); // Pushing tracking info data too quickly can stall screen updates
         }
     });
-
 }
+
 
 /**
  * Runs while the robot is in the disabled state of Field Management System or
@@ -150,10 +183,45 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-    // set position to x:0, y:0, heading:0
-    chassis.setPose(0, 0, 0);
-    // turn to face heading 90 with a very long timeout
-    chassis.turnToHeading(90, 100000);
+    switch (autonSelection) {
+        
+        case 0:
+            claw.move(0);
+            pros::lcd::print(3, "Running Red Auton");
+            chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
+            
+            lift_motors.move_relative(500, 127); //lift up by a minor amount to prevent hitting the ramp
+            wrist.move_absolute(-1080, 127);
+            lift_motors.move_relative(0, 127); 
+            chassis.moveToPose(35, -10, -90, 1000, {.forwards = false,.maxSpeed = 127}, false); // example: move to (1.0, 1.0, 0.0) with a 5-second timeout
+            pros::delay(1000);
+            claw.move(-127);
+            pros::delay(500);
+
+            chassis.moveToPoint(-3, -10, 1000, {.forwards = true,.maxSpeed = 127}, false);
+            chassis.moveToPose(-3, -10, 0, 1000, {.forwards = true,.maxSpeed = 127}, false);
+
+
+
+            break;
+        case 1:
+        chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
+            pros::lcd::print(3, "Running Blue Auton");
+            break;
+        case 2:
+            chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
+            pros::lcd::print(3, "Running Blue Auton");
+            break;
+        case 3:
+            chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
+            pros::lcd::print(3, "Running Skills Auton");
+            break;
+        default:
+            chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
+            pros::lcd::print(3, "Running Default Auton");
+            break;
+    }
+
 }
 
 /**
@@ -169,7 +237,6 @@ void autonomous() {
  * operator control task will be stopped. Re-enabling the robot will restart the
  * task, not resume it from where it left off.
  */
-pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 // make a boolean variable to track the scoring/intaking macro
 bool clawPosition = false;
@@ -208,21 +275,30 @@ void opcontrol() {
         }
 
         //make a short macro for toggling scoring position
-        if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)){
+        if(controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)){
             if (clawPosition == false){
                 
                 lift_motors.move_relative(500, 127); //lift up by a minor amount to prevent hitting the ramp
-                wrist.move_absolute(-1000, 127); //flip wrist upright for scoring
+                wrist.move_absolute(-1070, 127); //flip wrist upright for scoring
 
                 clawPosition = true; // set to other position (scoring position)
             } else if (clawPosition == true){
+                if(lift_motors.get_position() < 500){
 
-                wrist.move_absolute(0, 127); //flip wrist down for intaking
+                    lift_motors.move_relative(500, 127); //make sure the ramp isn't hit
+                    pros::delay(50); // wait for the lift to move before flipping the wrist
+                    wrist.move_absolute(0, 127); //flip wrist down for intaking
+
+                } else if (lift_motors.get_position() >= 500){
+
+                    wrist.move_absolute(0, 127); //flip wrist down for intaking
+
+                }
 
                 clawPosition = false; //set to other position (intaking position)
             }
             
-            pros::delay(25); // delay to debounce
+            pros::delay(100); // delay to debounce
         }
 
         //make a small macro to test PID
