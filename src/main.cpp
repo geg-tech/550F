@@ -280,6 +280,7 @@ void opcontrol() {
 
         //make a small macro to test PID
         //angular PID
+        /*
         if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_X)){ //niche ahh button
             //reset position
             chassis.setPose(0,0,0);
@@ -291,6 +292,9 @@ void opcontrol() {
             chassis.turnToHeading(0,4000);
             pros::delay(100);
         }
+        */
+
+
 
         // delay to save resources
         pros::delay(25);
