@@ -8,25 +8,34 @@
 // create motors and motor groups
 pros::MotorGroup left_motors({-5, -6, -7}, pros::MotorGearset::blue); // left motors on ports 10, 18, 19
 pros::MotorGroup right_motors({2, 3, 4}, pros::MotorGearset::blue); // right motors on ports 1, 11, 12
-pros::MotorGroup lift_motors({13,-14}, pros::MotorGearset::blue); //Lift motors on ports 13 and 14
-pros::Motor claw(12, pros::MotorGearset::green); //banshee motor (positive = intake, negative = outtake)
-pros::Motor wrist(11, pros::MotorGearset::green); //wrist motor (-300 deg. = upright, 0 deg = down)
-pros::Motor intake(8, pros::MotorGearset::blue); //intake motor (negative = intake, positive = reverse)
+pros::MotorGroup lift_motors({-12, -13, 14, 15}, pros::MotorGearset::green);
+    //motors on ports 12, 13, 14, 15 => 12 and 13 on one side, 14 and 15 on other side
+    //changed numbers around cuz positive = lift upwards and negative = lift downwards
 
 //create pneumatics
-pros::adi::DigitalOut tipperMech ('A');
+pros::adi::DigitalOut clawPiston ('A');
 
 //create 3-wire and smart port sensors
-/* redundant code, since removed from robot
+/* nuke these cuz they aint on the robot but kept them in cuz i MIGHT add them later
 pros::adi::DigitalIn liftLimit('F');
 pros::adi::DigitalIn wristLimit('G');
 */
+
+//create rotation sensor for the lift
+pros::Rotation liftEncoder(16); //port 16
+
+//create distance sensor on claw for autoclaw shenanigans
+pros::Distance clawSensor(11); //port 11
 
 // create controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 // create an imu on port 15
 pros::Imu imu(15);
+
+// create the odom pod/tracking wheel
+pros::Rotation vertical_encoder(8);
+lemlib::TrackingWheel vertical_tracking_wheel(&vertical_encoder, lemlib::Omniwheel::NEW_2, 0);
 
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&left_motors, // left motor group
@@ -38,7 +47,7 @@ lemlib::Drivetrain drivetrain(&left_motors, // left motor group
 );
 
 //drivetrain sensors
-lemlib::OdomSensors sensors(nullptr, // vertical tracking wheel 1, set to null
+lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel 1, set to null
                             nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
                             nullptr, // horizontal tracking wheel 1
                             nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
@@ -166,40 +175,37 @@ void competition_initialize() {}
 void autonomous() {
     switch (autonSelection) {
         
-        case 0:
-            claw.move(0);
-            pros::lcd::print(3, "Running Red Auton");
+        case 0: //right auto
+            chassis.setPose(0, 0, 0); // set initial pose to x = 0, y = 0, theta = 0
+            pros::lcd::print(3, "Running Right Auton");
+
+            lift_motors.move_absolute(300, 127); // Move lift up 100 degrees at full speed
+            clawPiston.set_value(true); // Close claw
+            pros::delay(500); // Wait for 500ms to ensure lift and claw actions
+            chassis.moveToPoint(0, 36, 2000); // Move to point (0, 36) within 2000ms    
+            pros::delay(500); // Wait for 500ms to ensure movement is complete
+            lift_motors.move_absolute(0, 75); // Move lift down to 0 degrees at full speed
+            pros::delay(500); // Wait for 500ms to ensure lift action is complete
+            clawPiston.set_value(false); // Open claw
+
+            break;
+
+        case 1: //left auto
             chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
-            
-            lift_motors.move_relative(500, 127); //lift up by a minor amount to prevent hitting the ramp
-            wrist.move_absolute(-1080, 127);
-            lift_motors.move_relative(0, 127); 
-            chassis.moveToPose(35, -10, -90, 1000, {.forwards = false,.maxSpeed = 127}, false); // example: move to (1.0, 1.0, 0.0) with a 5-second timeout
-            pros::delay(1000);
-            claw.move(-127);
-            pros::delay(500);
-
-            chassis.moveToPoint(-3, -10, 1000, {.forwards = true,.maxSpeed = 127}, false);
-            chassis.moveToPose(-3, -10, 0, 1000, {.forwards = true,.maxSpeed = 127}, false);
-
-
+            pros::lcd::print(3, "Running Left Auton");
 
             break;
-        case 1:
-        chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
-            pros::lcd::print(3, "Running Blue Auton");
-            break;
-        case 2:
-            chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
-            pros::lcd::print(3, "Running Blue Auton");
-            break;
-        case 3:
+
+        case 2: //skills auto
             chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
             pros::lcd::print(3, "Running Skills Auton");
+
             break;
-        default:
+
+        default: //default
             chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
             pros::lcd::print(3, "Running Default Auton");
+
             break;
     }
 
@@ -207,11 +213,21 @@ void autonomous() {
 
 // ==================================== driver control ====================================
 bool clawPosition = false;
-bool tipperPosition = false;
 
 void opcontrol() {
-    lift_motors.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+    lift_motors.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD); 
+        // ^set the motors to hold so that it keeps height
 
+    // ------------------- *record scratch* ok quick controls recap -------------------
+    // joysticks -> drive (duh)
+    // L1 -> lift up
+    // L2 -> lift down
+    // down -> claw open/close (toggle)
+    // a -> run autonomous code
+    // b -> skip to driver control
+    // left/right -> cycle through auto selector
+    // ------------------- ok back to the code *dramatic sound effect* -------------------
+    
     while (true) {
         // ==================================== joystick control ====================================
         // get left y and right x positions
@@ -221,81 +237,22 @@ void opcontrol() {
         // move the robot
         chassis.arcade(leftY, rightX);
 
-        // ==================================== button controls/macros ====================================
+        // ==================================== button controls/macro ====================================
         // lift
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) { //lift upwards
-            lift_motors.move(-127); //made this negative cuz new winch geometry
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) { //lift 
+            lift_motors.move(127); //raise the lift at full speed
         } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)){ //lower lift
-            lift_motors.move(100); //slightly slower than up to make the rope not explode itself
+            lift_motors.move(-100); //make this slower to ensure that the rope doesnt explode and gunk the cascade
         } else {
-            lift_motors.move(0);
+            lift_motors.move(0); //stop! stop! stop!
         }
 
         // intake and claw
-        if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)){ //intake
-            // spin both claw and intake at once to ensure smooth flow
-            // essentially a motor group, but separate for autos
-            claw.move(127); //move forward
-            intake.move(-127);
-        }else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)){ //outtake
-            claw.move(-127); //move reverse
-            intake.move(127);
-        } else {
-            claw.move(0); //no dont move
-            intake.move(0);
+        if(controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)){ //intake
+            clawPosition = !clawPosition; // swap between states
+            clawPiston.set_value(clawPosition); // use that state to toggle the piston
         }
 
-        //make a short macro for toggling scoring position
-        if(controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)){ // whever pressed down
-            if (clawPosition == false){ //if wrist is down (false) -> rotate wrist up
-                
-                lift_motors.move_relative(500, 127); //lift up by a minor amount to prevent hitting the ramp
-                wrist.move_absolute(-1070, 127); //flip wrist upright for scoring
-
-                clawPosition = true; // set to other position (scoring position)
-                
-            } else if (clawPosition == true){ //if wrist is up (true) -> rotate wrist down
-                if(lift_motors.get_position() < 500){
-
-                    lift_motors.move_relative(500, 127); //make sure the ramp isn't hit
-                    pros::delay(50); // wait for the lift to move before flipping the wrist
-                    wrist.move_absolute(0, 127); //flip wrist down for intaking
-
-                } else if (lift_motors.get_position() >= 500){
-
-                    wrist.move_absolute(0, 127); //flip wrist down for intaking
-
-                }
-                clawPosition = false; //set to other position (intaking position)
-            }
-            pros::delay(100); // delay to debounce
-        }
-
-        //make a button toggle the tipper mech piston
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)){
-            if (tipperPosition == false) {
-                tipperMech.set_value(false); // push piston down
-                tipperPosition = true; //swap to down position
-            } else if (tipperPosition == true) {
-                tipperMech.set_value(true); // push piston up
-                tipperPosition = false; //swap to up position
-            }
-        }
-
-
-        //make a small macro to test PID
-        //angular PID
-        if(controller.get_digital(pros::E_CONTROLLER_DIGITAL_X)){ //niche ahh button
-            //reset position
-            chassis.setPose(0,0,0);
-            //turn
-            chassis.turnToHeading(90,4000);
-            pros::delay(100);
-            chassis.turnToHeading(180,4000);
-            pros::delay(100);
-            chassis.turnToHeading(0,4000);
-            pros::delay(100);
-        }
 
         // delay to save resources
         pros::delay(25);
