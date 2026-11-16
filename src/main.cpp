@@ -6,8 +6,8 @@
 
 // ==================================== devices ====================================
 // create motors and motor groups
-pros::MotorGroup left_motors({-5, -6, -7}, pros::MotorGearset::blue); // left motors on ports 10, 18, 19
-pros::MotorGroup right_motors({2, 3, 4}, pros::MotorGearset::blue); // right motors on ports 1, 11, 12
+pros::MotorGroup left_motors({-2, -3, -4}, pros::MotorGearset::blue); // left motors on ports 10, 18, 19
+pros::MotorGroup right_motors({5, 6, 7}, pros::MotorGearset::blue); // right motors on ports 1, 11, 12
 pros::MotorGroup lift_motors({-12, -13, 14, 15}, pros::MotorGearset::green);
     //motors on ports 12, 13, 14, 15 => 12 and 13 on one side, 14 and 15 on other side
     //changed numbers around cuz positive = lift upwards and negative = lift downwards
