@@ -30,12 +30,16 @@ pros::Distance clawSensor(11); //port 11
 // create controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
-// create an imu on port 15
-pros::Imu imu(15);
+// create an imu on port 17
+pros::Imu imu(17);
 
-// create the odom pod/tracking wheel
+// create the odom pod/tracking wheels
+// X and Y follow the same layout of a standard cartesian plane (+x to the right, +y forwards from the driver box)
 pros::Rotation vertical_encoder(8);
+pros::Rotation horizontal_encoder(-18); //reverse direction so y position is right
 lemlib::TrackingWheel vertical_tracking_wheel(&vertical_encoder, lemlib::Omniwheel::NEW_2, 0);
+lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_encoder, lemlib::Omniwheel::NEW_2, 2.8);
+
 
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&left_motors, // left motor group
@@ -49,7 +53,7 @@ lemlib::Drivetrain drivetrain(&left_motors, // left motor group
 //drivetrain sensors
 lemlib::OdomSensors sensors(&vertical_tracking_wheel, // vertical tracking wheel 1, set to null
                             nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
-                            nullptr, // horizontal tracking wheel 1
+                            &horizontal_tracking_wheel, // horizontal tracking wheel 1
                             nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
                             &imu // inertial sensor
 );
@@ -94,6 +98,11 @@ lemlib::Chassis chassis(drivetrain, // drivetrain settings
                         angular_controller, // angular PID settings
                         sensors // odometry sensors
 );
+
+// create jerry.io paths for auto
+// pls ingore i was just fuckin around with this
+ASSET(pathjerryio_txt);
+ASSET(gegpath_txt);
 
 //yeah this function has to be here it stupid
 void on_center_button() {
@@ -179,18 +188,29 @@ void autonomous() {
             chassis.setPose(0, 0, 0); // set initial pose to x = 0, y = 0, theta = 0
             pros::lcd::print(3, "Running Right Auton");
 
+
+            /* old code for reference, remove if needed
             lift_motors.move_absolute(300, 127); // Move lift up 100 degrees at full speed
-            clawPiston.set_value(true); // Close claw
+            clawPiston.set_value(false); // close claw just to make sure
             pros::delay(500); // Wait for 500ms to ensure lift and claw actions
             chassis.moveToPoint(0, 36, 2000); // Move to point (0, 36) within 2000ms    
             pros::delay(500); // Wait for 500ms to ensure movement is complete
             lift_motors.move_absolute(0, 75); // Move lift down to 0 degrees at full speed
             pros::delay(500); // Wait for 500ms to ensure lift action is complete
-            clawPiston.set_value(false); // Open claw
+            clawPiston.set_value(false); // close claw
+            */
+
+            lift_motors.move_absolute(500,127); //move lift out of the way of the goal
+            chassis.moveToPoint(0,10,2000); //move forwards a bit to get away from the wall
+            chassis.moveToPoint(-20,20,2000); //move towards the goal
+            pros::delay(2000); //delay to simulate scoring and to not implode the robot
+            chassis.moveToPoint(-10,20,300); //get away from the goal really quickly
+            chassis.moveToPose(13.5,21,-180,4000, {.forwards = false}); //move to a good position to matchload
 
             break;
 
         case 1: //left auto
+            //alex's code for testing, please change if needed
             chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
             pros::lcd::print(3, "Running Left Auton");
 
@@ -200,12 +220,15 @@ void autonomous() {
             chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
             pros::lcd::print(3, "Running Skills Auton");
 
+            //testing jerry.io, please ignore
+            chassis.follow(gegpath_txt, 15, 50000); // follow the path with max speed of 127 and no other constraints
+
             break;
 
         default: //default
             chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
             pros::lcd::print(3, "Running Default Auton");
-
+            
             break;
     }
 
