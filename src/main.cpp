@@ -22,7 +22,7 @@ pros::adi::DigitalIn wristLimit('G');
 */
 
 //create rotation sensor for the lift
-pros::Rotation liftEncoder(16); //port 16
+pros::Rotation liftEncoder(-16); //port 16
 
 //create distance sensor on claw for autoclaw shenanigans
 pros::Distance clawSensor(11); //port 11
@@ -100,7 +100,7 @@ lemlib::Chassis chassis(drivetrain, // drivetrain settings
 );
 
 // create jerry.io paths for auto
-// pls ingore i was just fuckin around with this
+// pls ingore i was just messing around with this
 ASSET(pathjerryio_txt);
 ASSET(gegpath_txt);
 
@@ -170,6 +170,7 @@ void initialize(){
             pros::lcd::print(4, "X: %f", chassis.getPose().x); 
             pros::lcd::print(5, "Y: %f", chassis.getPose().y); 
             pros::lcd::print(6, "Theta: %f", chassis.getPose().theta); 
+            pros::lcd::print(7, "Lift Encoder: %f", liftEncoder.get_position());
             pros::delay(50); // Pushing tracking info data too quickly can stall screen updates
         }
     });
@@ -179,6 +180,28 @@ void initialize(){
 void disabled() {}
 
 void competition_initialize() {}
+
+int allianceHeights[5] = {1000, 1500, 2000, 2500, 3000}; // array to store alliance heights for each auton
+int neutralHeights[5] = {1000, 1500, 2000, 2500, 3000}; // array to store neutral heights for each auton
+int centerHeights[3] = {1500, 2000, 2500}; // array to store center heights for each auton
+
+int heightVar = 0;
+//this function uses lift encoder to move the lift to designated height, more consistent then motor encoders
+// void liftToHeight(int targetHeight, int speed) {
+//     int currentHeight = liftEncoder.get_position(); // get the current height of the lift
+//     if (currentHeight < targetHeight) { // if the lift is below the target height
+//         while (liftEncoder.get_position() < targetHeight) { // while the lift is below the target height
+//             lift_motors.move(speed); // move the lift up at designated speed
+//             pros::delay(10); // delay to prevent CPU overload
+//         }
+//     } else if (currentHeight > targetHeight) { // if the lift is above the target height
+//         while (liftEncoder.get_position() > targetHeight) { // while the lift is above the target height
+//             lift_motors.move(-speed); // move the lift down at designated speed
+//             pros::delay(10); // delay to prevent CPU overload
+//         }
+//     }
+//     lift_motors.move(0); // stop the lift motors when the target height is reached
+// }
 
 // ==================================== autonomous ====================================
 void autonomous() {
@@ -190,22 +213,38 @@ void autonomous() {
 
 
             /* old code for reference, remove if needed
-            lift_motors.move_absolute(300, 127); // Move lift up 100 degrees at full speed
+            liftToHeight(300, 127); // Move lift up 100 degrees at full speed
             clawPiston.set_value(false); // close claw just to make sure
             pros::delay(500); // Wait for 500ms to ensure lift and claw actions
             chassis.moveToPoint(0, 36, 2000); // Move to point (0, 36) within 2000ms    
             pros::delay(500); // Wait for 500ms to ensure movement is complete
-            lift_motors.move_absolute(0, 75); // Move lift down to 0 degrees at full speed
+            liftToHeight(0, 75); // Move lift down to 0 degrees at full speed
             pros::delay(500); // Wait for 500ms to ensure lift action is complete
             clawPiston.set_value(false); // close claw
             */
 
-            lift_motors.move_absolute(500,127); //move lift out of the way of the goal
-            chassis.moveToPoint(0,10,2000); //move forwards a bit to get away from the wall
-            chassis.moveToPoint(-20,20,2000); //move towards the goal
-            pros::delay(2000); //delay to simulate scoring and to not implode the robot
-            chassis.moveToPoint(-10,20,300); //get away from the goal really quickly
-            chassis.moveToPose(13.5,21,-180,4000, {.forwards = false}); //move to a good position to matchload
+            chassis.moveToPoint(0,15,2000); //move forwards a bit to get away from the wall
+
+            while (heightVar <= 1) {
+                lift_motors.move_absolute(allianceHeights[heightVar], 127); //move lift out of the way of the goal
+                chassis.moveToPoint(-17,20, 1000, {.maxSpeed = 75}); //move towards the goal
+                pros::delay(1750); //delay to simulate scoring and to not implode the robot
+                clawPiston.set_value(true); //open the claw to score
+                lift_motors.move_absolute(0, 127); //lower the lift to matchload height
+                pros::delay(250);
+                chassis.moveToPoint(-10,19,500); //get away from the goal really quickly
+                if (heightVar == 1){
+                    break; //break out of the loop if we are done with the last height
+                }
+                chassis.moveToPose(13.5,21,-180,2000, {.forwards = false}); //move to a good position to matchload
+                chassis.moveToPoint(10., 7.5,  1000); //move to the matchload
+                pros::delay(1000); //delay to simulate picking up the matchload
+                clawPiston.set_value(false); //close the claw to pick up the matchload
+                pros::delay(1000); //delay to simulate picking up the matchload
+                chassis.moveToPoint(13.5,21,2000, {.forwards=false}); //move back to a good position to score
+
+                heightVar++; //increment the height variable to move to the next height
+            }
 
             break;
 
@@ -213,6 +252,28 @@ void autonomous() {
             //alex's code for testing, please change if needed
             chassis.setPose(0, 0, 0); // set initial pose to (0, 0, 0)
             pros::lcd::print(3, "Running Left Auton");
+            chassis.moveToPoint(0,15,2000); // move forwards a bit to get away from the wall
+
+            while (heightVar <= 1) {
+                lift_motors.move_absolute(allianceHeights[heightVar], 127); // move lift out of the way of the goal
+                chassis.moveToPoint(17,20, 1000, {.maxSpeed = 75}); // move towards the goal
+                pros::delay(1750); // delay to simulate scoring and to not implode the robot
+                clawPiston.set_value(true); // open the claw to score
+                lift_motors.move_absolute(0, 127); // lower the lift to matchload height
+                pros::delay(250);
+                chassis.moveToPoint(10,19,500); // get away from the goal really quickly
+                if (heightVar == 1){
+                    break; // break out of the loop if we are done with the last height
+                }
+                chassis.moveToPose(-13.5,21,180,2000, {.forwards = false}); // mirrored pose
+                chassis.moveToPoint(-10, 7.5, 1000); // move to the matchload
+                pros::delay(1000); // delay to simulate picking up the matchload
+                clawPiston.set_value(false); // close the claw to pick up the matchload
+                pros::delay(1000); // delay to simulate picking up the matchload
+                chassis.moveToPoint(-13.5,21,2000, {.forwards = false}); // move back to a good position to score
+
+                heightVar++; // increment the height variable to move to the next height
+            }
 
             break;
 
@@ -221,8 +282,55 @@ void autonomous() {
             pros::lcd::print(3, "Running Skills Auton");
 
             //testing jerry.io, please ignore
-            chassis.follow(gegpath_txt, 15, 50000); // follow the path with max speed of 127 and no other constraints
+            //chassis.follow(gegpath_txt, 15, 50000); // follow the path with max speed of 127 and no other constraints
 
+            chassis.moveToPoint(0,15,2000); //move forwards a bit to get away from the wall
+
+            while (heightVar <= 4) {
+                lift_motors.move_absolute(allianceHeights[heightVar], 127); //move lift out of the way of the goal
+                chassis.moveToPoint(-17,20, 1000, {.maxSpeed = 75}); //move towards the goal
+                pros::delay(1750); //delay to simulate scoring and to not implode the robot
+                clawPiston.set_value(true); //open the claw to score
+                lift_motors.move_absolute(0, 127); //lower the lift to matchload height
+                pros::delay(250);
+                chassis.moveToPoint(-10,22,500); //get away from the goal really quickly
+                lift_motors.move_absolute(0, 127);
+                chassis.moveToPose(13.5,22,-180,2000, {.forwards = false}); //move to a good position to matchload
+                chassis.moveToPoint(12, 6,  1000); //move to the matchload
+                pros::delay(1000); //delay to simulate picking up the matchload
+                clawPiston.set_value(false); //close the claw to pick up the matchload
+                pros::delay(1000); //delay to simulate picking up the matchload
+                chassis.moveToPoint(13.5,22,2000, {.forwards=false}); //move back to a good position to score
+                if (heightVar == 4){
+                    break; //break out of the loop if we are done with the last height
+                }
+            
+                heightVar++; //increment the height variable to move to the next height
+            }
+
+            heightVar = 0; //reset the height variable for center goal scoring
+            pros::delay(1000); //delay to simulate scoring and to not implode the robot
+            while (heightVar <= 2) {
+                lift_motors.move_absolute(centerHeights[heightVar],127); //move lift out of the way of the goal
+                chassis.moveToPoint(-56, 56, 7000, {.maxSpeed=50}); //move to a good position to score the center goal
+                pros::delay(1000); //delay to simulate scoring and to not implode the robot
+                clawPiston.set_value(true); //open the claw to score
+                lift_motors.move_absolute(0, 127); //lower the lift to matchload height
+                pros::delay(250);
+                chassis.moveToPoint(-50,50,500, {.forwards=false});
+                if (heightVar == 2){
+                    break; //break out of the loop if we are done with the last height
+                }
+                chassis.moveToPose(13.5,22,-180,2000, {.forwards = false}); //move to a good position to matchload
+                chassis.moveToPoint(12, 6,  1000); //move to the matchload
+                pros::delay(1000); //delay to simulate picking up the matchload
+                clawPiston.set_value(false); //close the claw to pick up the matchload
+                pros::delay(1000); //delay to simulate picking up the matchload
+                chassis.moveToPoint(13.5,22,2000, {.forwards=false}); //move back to a good position to score
+
+                heightVar++; //increment the height variable to move to the next height
+            }
+            
             break;
 
         default: //default
